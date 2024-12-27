@@ -1,0 +1,190 @@
+import asyncio
+import json
+import os
+import threading
+import webbrowser
+from tkinter import Tk, Entry, Button, Listbox, messagebox
+from flask import Flask, request
+from twitchio.ext import commands
+import requests
+
+# Configuration
+CLIENT_ID = 'xkwznb85svx9ogghla4hh4kieco2ei'
+CLIENT_SECRET = 'erg9e55ctrvwpggkcwdsewa4t4mwcy'
+REDIRECT_URI = 'http://localhost:3000'
+SUSPICIOUS_WORDS_FILE = os.path.join(os.getcwd(), "suspicious_words.json")
+USER_DATA_FILE = os.path.join(os.getcwd(), "user_data.json")
+JSON_DIR = os.path.join(os.getcwd(), "chat_data")
+os.makedirs(JSON_DIR, exist_ok=True)
+
+# Shared Data and Locks
+SUSPICIOUS_WORDS = []
+word_usage_count = {}
+lock = threading.Lock()
+
+# Suspicious threshold
+THRESHOLD = 1000  # Fixed threshold for word usage
+
+# Load Suspicious Words
+if os.path.exists(SUSPICIOUS_WORDS_FILE):
+    with open(SUSPICIOUS_WORDS_FILE, 'r') as f:
+        SUSPICIOUS_WORDS = json.load(f)
+        word_usage_count = {word: 0 for word in SUSPICIOUS_WORDS}
+
+# Flask App for OAuth
+app = Flask(__name__)
+
+def save_user_data(token, channel):
+    user_data = {}
+    if os.path.exists(USER_DATA_FILE):
+        with open(USER_DATA_FILE, 'r') as f:
+            user_data = json.load(f)
+    user_data[channel] = {'token': token}
+    with open(USER_DATA_FILE, 'w') as f:
+        json.dump(user_data, f, indent=4)
+
+def load_user_data():
+    if os.path.exists(USER_DATA_FILE):
+        with open(USER_DATA_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+def get_oauth_url():
+    scope = 'chat:read chat:edit'
+    return f"https://id.twitch.tv/oauth2/authorize?response_type=code&client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&scope={scope}"
+
+def exchange_code_for_token(code):
+    url = "https://id.twitch.tv/oauth2/token"
+    params = {
+        'client_id': CLIENT_ID,
+        'client_secret': CLIENT_SECRET,
+        'code': code,
+        'grant_type': 'authorization_code',
+        'redirect_uri': REDIRECT_URI
+    }
+    response = requests.post(url, data=params)
+    if response.status_code == 200:
+        return response.json().get('access_token')
+    return None
+
+@app.route('/')
+def handle_redirect():
+    code = request.args.get('code')
+    if code:
+        token = exchange_code_for_token(code)
+        if token:
+            # Ask for the channel name after login
+            return f"""
+            <form action="/setup" method="post">
+                <label for="channel">Enter your Twitch channel name:</label><br>
+                <input type="text" id="channel" name="channel"><br>
+                <input type="hidden" name="token" value="{token}">
+                <input type="submit" value="Submit">
+            </form>
+            """
+    return "Authorization failed."
+
+@app.route('/setup', methods=['POST'])
+def setup_channel():
+    token = request.form.get('token')
+    channel = request.form.get('channel')
+    if token and channel:
+        save_user_data(token, channel)
+        start_bot(token, channel)
+        return "Bot is now live in your channel!"
+    return "Failed to set up your bot."
+
+def start_flask():
+    app.run(port=3000)
+
+# Twitch Bot
+def start_bot(token, channel):
+    class ChatBot(commands.Bot):
+        def __init__(self, token, channel):
+            super().__init__(token=token, prefix='!', initial_channels=[channel])
+
+        async def event_ready(self):
+            print(f"Logged in as {self.nick}. Connected to {channel}.")
+
+        async def event_message(self, message):
+            with lock:
+                for word in SUSPICIOUS_WORDS:
+                    if word in message.content.lower():
+                        word_usage_count[word] += 1
+            await self.handle_commands(message)
+
+    async def run_bot():
+        bot = ChatBot(token=token, channel=channel)
+        await bot.start()
+
+    threading.Thread(target=asyncio.run, args=(run_bot(),), daemon=True).start()
+
+# Tkinter UI
+def create_ui():
+    def add_word():
+        new_word = word_entry.get().strip()
+        if new_word and new_word not in SUSPICIOUS_WORDS:
+            with lock:
+                SUSPICIOUS_WORDS.append(new_word)
+                word_usage_count[new_word] = 0
+            save_suspicious_words()
+            listbox.insert("end", new_word)
+            word_entry.delete(0, "end")
+
+    def delete_word():
+        selected = listbox.curselection()
+        if selected:
+            word = listbox.get(selected[0])
+            with lock:
+                SUSPICIOUS_WORDS.remove(word)
+                del word_usage_count[word]
+            save_suspicious_words()
+            listbox.delete(selected)
+
+    def rate_chat():
+        with lock:
+            if not SUSPICIOUS_WORDS:
+                messagebox.showinfo("Chat Rating", "No suspicious words loaded.")
+                return
+
+            # Calculate the suspicious percentage for each word based on the threshold
+            word_percentages = [
+                min((word_usage_count[word] / THRESHOLD) * 100, 100)  # Cap at 100%
+                for word in SUSPICIOUS_WORDS
+            ]
+
+            # Calculate the average suspicious level across all words
+            avg_suspicious_level = sum(word_percentages) / len(SUSPICIOUS_WORDS)
+
+        # Display the average suspicious level
+        messagebox.showinfo("Chat Rating", f"Suspicious chat activity: {round(avg_suspicious_level, 2)}%")
+
+    def start_login():
+        webbrowser.open(get_oauth_url())
+
+    def save_suspicious_words():
+        with open(SUSPICIOUS_WORDS_FILE, 'w') as f:
+            json.dump(SUSPICIOUS_WORDS, f, indent=4)
+
+    window = Tk()
+    window.title("Twitch Bot - Manage Suspicious Words")
+
+    word_entry = Entry(window, width=30)
+    word_entry.grid(row=0, column=0, padx=10, pady=10)
+
+    Button(window, text="Add Word", command=add_word).grid(row=0, column=1, padx=10, pady=10)
+    Button(window, text="Delete Word", command=delete_word).grid(row=1, column=1, padx=10, pady=10)
+    Button(window, text="Rate Chat", command=rate_chat).grid(row=2, column=0, padx=10, pady=10)
+    Button(window, text="Log in with Twitch", command=start_login).grid(row=2, column=1, padx=10, pady=10)
+
+    listbox = Listbox(window, width=40, height=10)
+    listbox.grid(row=1, column=0, padx=10, pady=10)
+    with lock:
+        for word in SUSPICIOUS_WORDS:
+            listbox.insert("end", word)
+
+    window.mainloop()
+
+if __name__ == "__main__":
+    threading.Thread(target=start_flask, daemon=True).start()
+    create_ui()
