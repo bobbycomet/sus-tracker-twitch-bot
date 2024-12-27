@@ -9,8 +9,8 @@ from twitchio.ext import commands
 import requests
 
 # Configuration
-CLIENT_ID = 'xkwznb85svx9ogghla4hh4kieco2ei'
-CLIENT_SECRET = 'erg9e55ctrvwpggkcwdsewa4t4mwcy'
+CLIENT_ID = ''
+CLIENT_SECRET = ''
 REDIRECT_URI = 'http://localhost:3000'
 SUSPICIOUS_WORDS_FILE = os.path.join(os.getcwd(), "suspicious_words.json")
 USER_DATA_FILE = os.path.join(os.getcwd(), "user_data.json")
