@@ -1,10 +1,10 @@
 # sus-tracker-twitch-bot V3 is current
-A bot that reads chats and checks for sus words to give a sus level 
+A Python application bot that reads chats and checks for sus words to give a sus level 
 Add Suspicious Words:
 Type the word you want to monitor into the box and click "Add Word."
 
 Update threshold V3:
-You can change the value of how the logic calculates dynamically. The logic is the same as below, but percent rate value changes with this new threshold you set.
+You can change the value of how the logic calculates dynamically. The logic is the same as below, but the percent rate value changes with this new threshold you set.
 
 Delete a Word:
 Highlight the word in the list, then click "Delete Word" to remove it from monitoring.
