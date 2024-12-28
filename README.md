@@ -2,9 +2,6 @@
 A bot that reads chats and checks for sus words to give a sus level 
 Add Suspicious Words:
 Type the word you want to monitor into the box and click "Add Word."
-If you want to monitor case variations, you’ll need to add each variation separately. For example:
-Type "Fuck" and click "Add Word."
-Then type "fuck" and click "Add Word."
 
 Delete a Word:
 Highlight the word in the list, then click "Delete Word" to remove it from monitoring.
@@ -56,3 +53,5 @@ Why 1,000?
 The 1,000-message threshold ensures that the bot is useful for channels of all sizes:
 Smaller channels can still detect suspicious words.
 Larger channels don’t inflate the numbers disproportionately.
+
+Edit: I added where it counts the number of words used, and there are no more case-sensitive words.
