@@ -3,6 +3,9 @@ A bot that reads chats and checks for sus words to give a sus level
 Add Suspicious Words:
 Type the word you want to monitor into the box and click "Add Word."
 
+Update threshold V3:
+You can change the value of how the logic calculates dynamically. The logic is the same as below, but percent rate value changes with this new threshold you set.
+
 Delete a Word:
 Highlight the word in the list, then click "Delete Word" to remove it from monitoring.
 Log In to Your Twitch Account:
@@ -10,6 +13,9 @@ Log In to Your Twitch Account:
 Click the "Log in with Twitch" button. This will take you to a login screen.
 After logging in, enter your Twitch channel name to connect to the bot.
 If the login doesn’t work initially, try logging in again for a fresh connection.
+
+You will need to log in each time you turn it on. This is how it resets for new chats.
+
 Firewall Notifications:
 The bot might trigger a firewall alert due to its use of networking libraries like Flask, Requests, and Twitch APIs.
 If this happens:
