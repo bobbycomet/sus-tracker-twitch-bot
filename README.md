@@ -1,10 +1,12 @@
 # sus-tracker-twitch-bot V3 is current
 Make sure all dependencies are installed, these are the imported libraries.
+
 A Python application bot that reads chats and checks for sus words to give a sus level 
 Add Suspicious Words:
 Type the word you want to monitor into the box and click "Add Word."
 
 Update threshold V3:
+
 You can change the value of how the logic calculates dynamically. The logic is the same as below, but the percent rate value changes with this new threshold you set. 200 is a good base start.
 
 Delete a Word:
@@ -18,10 +20,11 @@ If the login doesn’t work initially, try logging in again for a fresh connecti
 You will need to log in each time you turn it on. This is how it resets for new chats.
 
 Firewall Notifications:
+
 The bot might trigger a firewall alert due to its use of networking libraries like Flask, Requests, and Twitch APIs.
-If this happens:
-Click the firewall notification or go to your security settings under Firewall.
+If this happens: Click the firewall notification or go to your security settings under Firewall.
 Allow the bot through the firewall.
+
 Note: The bot contains no malicious code. It simply reads chat messages, counts occurrences of suspicious words, and updates a JSON file with the counts.
 
 If you’re concerned, the bot’s source code will be made available on GitHub. This will allow you to customize it or verify the code.
@@ -34,8 +37,6 @@ This can be used as fun, or for moderation purposes.
 
 What the Bot Doesn't Do
 Moderation: The bot does not moderate chat, issue warnings, kick users, or take any other action against participants. It’s purely for fun and analysis.
-
-Word Tracking: The bot will not show which specific words were used in the final suspicious level calculation. It only provides an overall suspicious percentage.
 
 Customization Needed for Moderation: If you require moderation tools, you’ll need to add them separately to suit your specific use cases.
 
