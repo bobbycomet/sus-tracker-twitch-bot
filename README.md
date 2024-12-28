@@ -1,5 +1,5 @@
 # sus-tracker-twitch-bot V3 is current
-Make sure all dependencies are installed, these are the imported libraries.
+Make sure all dependencies are installed, these are the imported libraries. I used pyinstaller, but some may not have installed through it like requests or twitch
 
 A Python application bot that reads chats and checks for sus words to give a sus level 
 Add Suspicious Words:
