@@ -1,4 +1,5 @@
 # sus-tracker-twitch-bot V3 is current
+Make sure all dependencies are installed, these are the imported libraries.
 A Python application bot that reads chats and checks for sus words to give a sus level 
 Add Suspicious Words:
 Type the word you want to monitor into the box and click "Add Word."
