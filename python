@@ -3,7 +3,7 @@ import json
 import os
 import threading
 import webbrowser
-from tkinter import Tk, Entry, Button, Listbox, messagebox
+from tkinter import Tk, Entry, Button, Listbox, messagebox, Label
 from flask import Flask, request
 from twitchio.ext import commands
 import requests
@@ -23,7 +23,7 @@ word_usage_count = {}
 lock = threading.Lock()
 
 # Suspicious threshold
-THRESHOLD = 1000  # Fixed threshold for word usage
+threshold = 1000  # Default threshold value, now dynamic
 
 # Load Suspicious Words
 if os.path.exists(SUSPICIOUS_WORDS_FILE):
@@ -73,7 +73,6 @@ def handle_redirect():
     if code:
         token = exchange_code_for_token(code)
         if token:
-            # Ask for the channel name after login
             return f"""
             <form action="/setup" method="post">
                 <label for="channel">Enter your Twitch channel name:</label><br>
@@ -121,17 +120,30 @@ def start_bot(token, channel):
 
 # Tkinter UI
 def create_ui():
+    global threshold  # Declare threshold as global
+
+    def update_listbox():
+        """Update the listbox to reflect the current suspicious words."""
+        listbox.delete(0, "end")
+        with lock:
+            for word in SUSPICIOUS_WORDS:
+                listbox.insert("end", word)
+
     def add_word():
+        """Add a new word to the suspicious words list."""
         new_word = word_entry.get().strip()
         if new_word and new_word not in SUSPICIOUS_WORDS:
             with lock:
                 SUSPICIOUS_WORDS.append(new_word)
                 word_usage_count[new_word] = 0
             save_suspicious_words()
-            listbox.insert("end", new_word)
+            update_listbox()
             word_entry.delete(0, "end")
+        else:
+            messagebox.showinfo("Error", "Word already exists or is invalid.")
 
     def delete_word():
+        """Delete the selected word from the suspicious words list."""
         selected = listbox.curselection()
         if selected:
             word = listbox.get(selected[0])
@@ -139,30 +151,53 @@ def create_ui():
                 SUSPICIOUS_WORDS.remove(word)
                 del word_usage_count[word]
             save_suspicious_words()
-            listbox.delete(selected)
+            update_listbox()
+        else:
+            messagebox.showinfo("Error", "No word selected.")
 
     def rate_chat():
+        """Rate the chat based on suspicious words usage."""
         with lock:
             if not SUSPICIOUS_WORDS:
                 messagebox.showinfo("Chat Rating", "No suspicious words loaded.")
                 return
 
-            # Calculate the suspicious percentage for each word based on the threshold
             word_percentages = [
-                min((word_usage_count[word] / THRESHOLD) * 100, 100)  # Cap at 100%
+                min((word_usage_count[word] / threshold) * 100, 100)
                 for word in SUSPICIOUS_WORDS
             ]
 
-            # Calculate the average suspicious level across all words
             avg_suspicious_level = sum(word_percentages) / len(SUSPICIOUS_WORDS)
 
-        # Display the average suspicious level
-        messagebox.showinfo("Chat Rating", f"Suspicious chat activity: {round(avg_suspicious_level, 2)}%")
+            word_details = "\n".join(
+                f"{word}: {count} time(s)"
+                for word, count in word_usage_count.items() if count > 0
+            )
+
+        messagebox.showinfo(
+            "Chat Rating",
+            f"Suspicious chat activity: {round(avg_suspicious_level, 2)}%\n\nWords used:\n{word_details}"
+        )
+
+    def update_threshold():
+        """Update the suspicious words threshold."""
+        global threshold
+        try:
+            new_threshold = int(threshold_entry.get().strip())
+            if new_threshold > 0:
+                threshold = new_threshold
+                messagebox.showinfo("Threshold Update", f"Threshold updated to {threshold}.")
+            else:
+                messagebox.showerror("Invalid Input", "Threshold must be a positive integer.")
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please enter a valid integer for the threshold.")
 
     def start_login():
+        """Open the Twitch login URL."""
         webbrowser.open(get_oauth_url())
 
     def save_suspicious_words():
+        """Save suspicious words to the file."""
         with open(SUSPICIOUS_WORDS_FILE, 'w') as f:
             json.dump(SUSPICIOUS_WORDS, f, indent=4)
 
@@ -173,18 +208,29 @@ def create_ui():
     word_entry.grid(row=0, column=0, padx=10, pady=10)
 
     Button(window, text="Add Word", command=add_word).grid(row=0, column=1, padx=10, pady=10)
-    Button(window, text="Delete Word", command=delete_word).grid(row=1, column=1, padx=10, pady=10)
-    Button(window, text="Rate Chat", command=rate_chat).grid(row=2, column=0, padx=10, pady=10)
-    Button(window, text="Log in with Twitch", command=start_login).grid(row=2, column=1, padx=10, pady=10)
 
     listbox = Listbox(window, width=40, height=10)
     listbox.grid(row=1, column=0, padx=10, pady=10)
-    with lock:
-        for word in SUSPICIOUS_WORDS:
-            listbox.insert("end", word)
+
+    Button(window, text="Delete Word", command=delete_word).grid(row=1, column=1, padx=10, pady=10)
+
+    Button(window, text="Rate Chat", command=rate_chat).grid(row=3, column=0, padx=10, pady=10)
+    Button(window, text="Log in with Twitch", command=start_login).grid(row=3, column=1, padx=10, pady=10)
+
+    threshold_label = Label(window, text="Threshold:")
+    threshold_label.grid(row=2, column=0, padx=10, pady=5)
+
+    threshold_entry = Entry(window, width=10)
+    threshold_entry.insert(0, str(threshold))
+    threshold_entry.grid(row=2, column=1, padx=10, pady=5)
+
+    Button(window, text="Update Threshold", command=update_threshold).grid(row=2, column=2, padx=10, pady=5)
+
+    update_listbox()  # Initialize the listbox with the current words
 
     window.mainloop()
 
 if __name__ == "__main__":
     threading.Thread(target=start_flask, daemon=True).start()
     create_ui()
+
