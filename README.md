@@ -4,7 +4,7 @@ Add Suspicious Words:
 Type the word you want to monitor into the box and click "Add Word."
 
 Update threshold V3:
-You can change the value of how the logic calculates dynamically. The logic is the same as below, but the percent rate value changes with this new threshold you set.
+You can change the value of how the logic calculates dynamically. The logic is the same as below, but the percent rate value changes with this new threshold you set. 200 is a good base start.
 
 Delete a Word:
 Highlight the word in the list, then click "Delete Word" to remove it from monitoring.
