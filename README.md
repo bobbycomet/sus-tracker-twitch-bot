@@ -1,4 +1,4 @@
-# sus-tracker-twitch-bot
+# sus-tracker-twitch-bot V3 is current
 A bot that reads chats and checks for sus words to give a sus level 
 Add Suspicious Words:
 Type the word you want to monitor into the box and click "Add Word."
