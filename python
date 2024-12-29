@@ -3,7 +3,7 @@ import json
 import os
 import threading
 import webbrowser
-from tkinter import Tk, Entry, Button, Listbox, messagebox, Label
+from tkinter import Tk, Entry, Button, Listbox, messagebox, Label, StringVar, OptionMenu, Frame
 from flask import Flask, request
 from twitchio.ext import commands
 import requests
@@ -14,6 +14,7 @@ CLIENT_SECRET = ''
 REDIRECT_URI = 'http://localhost:3000'
 SUSPICIOUS_WORDS_FILE = os.path.join(os.getcwd(), "suspicious_words.json")
 USER_DATA_FILE = os.path.join(os.getcwd(), "user_data.json")
+SETTINGS_FILE = os.path.join(os.getcwd(), "settings.json")
 JSON_DIR = os.path.join(os.getcwd(), "chat_data")
 os.makedirs(JSON_DIR, exist_ok=True)
 
@@ -49,6 +50,35 @@ def load_user_data():
             return json.load(f)
     return {}
 
+def save_settings(ui_color, text_color, button_color, threshold):
+    settings = {
+        "ui_color": ui_color,
+        "text_color": text_color,
+        "button_color": button_color,
+        "threshold": threshold
+    }
+    with open(SETTINGS_FILE, 'w') as f:
+        json.dump(settings, f, indent=4)
+
+def load_settings():
+    default_settings = {
+        "ui_color": "white",
+        "text_color": "black",
+        "button_color": "lightgrey",
+        "threshold": 1000
+    }
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, 'r') as f:
+                settings = json.load(f)
+            for key, value in default_settings.items():
+                if key not in settings or not isinstance(settings[key], type(value)):
+                    settings[key] = value
+            return settings
+        except (json.JSONDecodeError, IOError):
+            messagebox.showerror("Error", "Settings file is corrupted. Using default settings.")
+    return default_settings
+
 def get_oauth_url():
     scope = 'chat:read chat:edit'
     return f"https://id.twitch.tv/oauth2/authorize?response_type=code&client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&scope={scope}"
@@ -66,6 +96,12 @@ def exchange_code_for_token(code):
     if response.status_code == 200:
         return response.json().get('access_token')
     return None
+
+def validate_token(token):
+    url = "https://id.twitch.tv/oauth2/validate"
+    headers = {"Authorization": f"OAuth {token}"}
+    response = requests.get(url, headers=headers)
+    return response.status_code == 200
 
 @app.route('/')
 def handle_redirect():
@@ -90,7 +126,7 @@ def setup_channel():
     if token and channel:
         save_user_data(token, channel)
         start_bot(token, channel)
-        return "Bot is now live in your channel!"
+        return "Sus Tracker is now live in your channel!"
     return "Failed to set up your bot."
 
 def start_flask():
@@ -121,6 +157,15 @@ def start_bot(token, channel):
 # Tkinter UI
 def create_ui():
     global threshold  # Declare threshold as global
+
+    settings = load_settings()
+    threshold = settings["threshold"]
+
+    user_data = load_user_data()
+    for channel, data in user_data.items():
+        token = data.get("token")
+        if token and validate_token(token):
+            start_bot(token, channel)
 
     def update_listbox():
         """Update the listbox to reflect the current suspicious words."""
@@ -159,7 +204,7 @@ def create_ui():
         """Rate the chat based on suspicious words usage."""
         with lock:
             if not SUSPICIOUS_WORDS:
-                messagebox.showinfo("Chat Rating", "No suspicious words loaded.")
+                messagebox.showinfo("Sus Level", "No suspicious words loaded.")
                 return
 
             word_percentages = [
@@ -167,7 +212,7 @@ def create_ui():
                 for word in SUSPICIOUS_WORDS
             ]
 
-            avg_suspicious_level = sum(word_percentages) / len(SUSPICIOUS_WORDS)
+            avg_sus_level = sum(word_percentages) / len(SUSPICIOUS_WORDS)
 
             word_details = "\n".join(
                 f"{word}: {count} time(s)"
@@ -175,9 +220,16 @@ def create_ui():
             )
 
         messagebox.showinfo(
-            "Chat Rating",
-            f"Suspicious chat activity: {round(avg_suspicious_level, 2)}%\n\nWords used:\n{word_details}"
+            "Sus Level",
+            f"Sus level: {round(avg_sus_level, 2)}%\n\nWords used:\n{word_details}"
         )
+
+    def reset_chat():
+        """Reset the suspicious level counters."""
+        with lock:
+            for word in SUSPICIOUS_WORDS:
+                word_usage_count[word] = 0
+        messagebox.showinfo("Reset Sus Level", "Sus level has been reset.")
 
     def update_threshold():
         """Update the suspicious words threshold."""
@@ -186,6 +238,7 @@ def create_ui():
             new_threshold = int(threshold_entry.get().strip())
             if new_threshold > 0:
                 threshold = new_threshold
+                save_settings(color_var.get(), text_color_var.get(), button_color_var.get(), threshold)
                 messagebox.showinfo("Threshold Update", f"Threshold updated to {threshold}.")
             else:
                 messagebox.showerror("Invalid Input", "Threshold must be a positive integer.")
@@ -201,32 +254,107 @@ def create_ui():
         with open(SUSPICIOUS_WORDS_FILE, 'w') as f:
             json.dump(SUSPICIOUS_WORDS, f, indent=4)
 
+    def update_colors():
+        """Update the colors of the UI elements."""
+        color = color_var.get()
+        button_color = button_color_var.get()
+        window.configure(bg=color)
+        for widget in widgets:
+            widget.configure(bg=color, fg=text_color_var.get())
+        for button in buttons:
+            button.configure(bg=button_color)
+        save_settings(color, text_color_var.get(), button_color, threshold)
+
+    def upload_settings():
+        """Upload the current settings for sharing or backup."""
+        try:
+            with open(SETTINGS_FILE, 'r') as f:
+                settings = json.load(f)
+            upload_path = os.path.join(os.getcwd(), "uploaded_settings.json")
+            with open(upload_path, 'w') as uf:
+                json.dump(settings, uf, indent=4)
+            messagebox.showinfo("Upload Settings", f"Settings successfully uploaded to {upload_path}.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to upload settings: {e}")
+
+    # Main UI Window
     window = Tk()
-    window.title("Twitch Bot - Manage Suspicious Words")
+    window.title("Sus Tracker - Manage Suspicious Words")
+
+    color_var = StringVar(value=settings["ui_color"])
+    text_color_var = StringVar(value=settings["text_color"])
+    button_color_var = StringVar(value=settings["button_color"])
+
+    color_label = Label(window, text="UI Color:")
+    color_label.grid(row=0, column=2, padx=10, pady=5)
+
+    color_options = ["white", "lightblue", "lightgreen", "lightyellow", "pink", "grey", "purple",]
+    color_menu = OptionMenu(window, color_var, *color_options, command=lambda _: update_colors())
+    color_menu.grid(row=0, column=3, padx=10, pady=5)
+
+    text_color_label = Label(window, text="Text Color:")
+    text_color_label.grid(row=1, column=2, padx=10, pady=5)
+
+    text_color_menu = OptionMenu(window, text_color_var, *["black", "blue", "green", "red"], command=lambda _: update_colors())
+    text_color_menu.grid(row=1, column=3, padx=10, pady=5)
+
+    button_color_label = Label(window, text="Button Color:")
+    button_color_label.grid(row=2, column=2, padx=10, pady=5)
+
+    button_color_menu = OptionMenu(window, button_color_var, *["lightgrey", "white", "blue", "green", "red", "purple",], command=lambda _: update_colors())
+    button_color_menu.grid(row=2, column=3, padx=10, pady=5)
+
+    widgets = []  # Track all widgets for color updates
+    buttons = []  # Track all buttons for color updates
 
     word_entry = Entry(window, width=30)
     word_entry.grid(row=0, column=0, padx=10, pady=10)
+    widgets.append(word_entry)
 
-    Button(window, text="Add Word", command=add_word).grid(row=0, column=1, padx=10, pady=10)
+    add_word_button = Button(window, text="Add Word", command=add_word)
+    add_word_button.grid(row=0, column=1, padx=10, pady=10)
+    buttons.append(add_word_button)
 
     listbox = Listbox(window, width=40, height=10)
     listbox.grid(row=1, column=0, padx=10, pady=10)
+    widgets.append(listbox)
 
-    Button(window, text="Delete Word", command=delete_word).grid(row=1, column=1, padx=10, pady=10)
+    delete_word_button = Button(window, text="Delete Word", command=delete_word)
+    delete_word_button.grid(row=1, column=1, padx=10, pady=10)
+    buttons.append(delete_word_button)
 
-    Button(window, text="Rate Chat", command=rate_chat).grid(row=3, column=0, padx=10, pady=10)
-    Button(window, text="Log in with Twitch", command=start_login).grid(row=3, column=1, padx=10, pady=10)
+    rate_chat_button = Button(window, text="Rate Chat", command=rate_chat)
+    rate_chat_button.grid(row=3, column=0, padx=10, pady=10)
+    buttons.append(rate_chat_button)
+
+    reset_chat_button = Button(window, text="Reset Sus Level", command=reset_chat)
+    reset_chat_button.grid(row=3, column=1, padx=10, pady=10)
+    buttons.append(reset_chat_button)
+
+    login_button = Button(window, text="Log in with Twitch", command=start_login)
+    login_button.grid(row=3, column=2, padx=10, pady=10)
+    buttons.append(login_button)
+
+    upload_settings_button = Button(window, text="Upload Settings", command=upload_settings)
+    upload_settings_button.grid(row=3, column=3, padx=10, pady=10)
+    buttons.append(upload_settings_button)
 
     threshold_label = Label(window, text="Threshold:")
     threshold_label.grid(row=2, column=0, padx=10, pady=5)
+    widgets.append(threshold_label)
 
     threshold_entry = Entry(window, width=10)
     threshold_entry.insert(0, str(threshold))
     threshold_entry.grid(row=2, column=1, padx=10, pady=5)
+    widgets.append(threshold_entry)
 
-    Button(window, text="Update Threshold", command=update_threshold).grid(row=2, column=2, padx=10, pady=5)
+    update_threshold_button = Button(window, text="Update Threshold", command=update_threshold)
+    update_threshold_button.grid(row=2, column=2, padx=10, pady=5)
+    buttons.append(update_threshold_button)
 
     update_listbox()  # Initialize the listbox with the current words
+
+    update_colors()  # Apply saved settings initially
 
     window.mainloop()
 
