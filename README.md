@@ -37,6 +37,8 @@ Add your own png background
 
 Add mp3 for rate chat custom sound (works only if you hit ok after you read sus level, it will load the bot again, which looks like it broke, but just a delay)
 
+New button layout
+
 Persistent Data
 
 Saves suspicious words to a file (suspicious_words.json) for persistence.
