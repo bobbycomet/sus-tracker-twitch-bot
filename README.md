@@ -1,6 +1,8 @@
 # sus-tracker-twitch-bot V4 is current
 Sus Tracker
 
+This will alert your firewall. Just allow it because it involves creating a local web server using Flask and  making network requests. This is safe to use.
+
 Sus Tracker is a Python application designed to monitor and manage suspicious words in a Twitch chat. The application provides both a graphical user interface (GUI) and a Twitch bot to interact with the chat, allowing users to track, rate, and manage suspicious word usage. It also supports OAuth authentication for secure access to Twitch features.
 
 Features
