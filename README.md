@@ -1,4 +1,4 @@
-# sus-tracker-twitch-bot V4 is current
+# sus-tracker-twitch-bot V5 is current
 Sus Tracker
 
 This will alert your firewall. Just allow it because it involves creating a local web server using Flask and  making network requests. This is safe to use. 
@@ -32,6 +32,10 @@ Reset suspicious word usage statistics.
 Customize UI colors and button appearance.
 
 Update the threshold for suspicious activity evaluation.
+
+Add your own png background
+
+Add mp3 for rate chat custom sound (works only if you hit ok after you read sus level, it will load the bot again, which looks like it broke, but just a delay)
 
 Persistent Data
 
