@@ -39,6 +39,8 @@ Larger color choices for the UI
 
 New button layout
 
+Add an image as background. Image size dictates how much of the background is filled. Larger the image the more the background is filled.
+
 Persistent Data
 
 Saves suspicious words to a file (suspicious_words.json) for persistence.
