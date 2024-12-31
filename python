@@ -3,7 +3,8 @@ import json
 import os
 import threading
 import webbrowser
-from tkinter import Tk, Entry, Button, Listbox, messagebox, Label, StringVar, OptionMenu, Frame
+from tkinter import Tk, Entry, Button, Listbox, messagebox, Label, StringVar, OptionMenu, filedialog
+from tkinter.colorchooser import askcolor
 from flask import Flask, request
 from twitchio.ext import commands
 import requests
@@ -15,6 +16,7 @@ REDIRECT_URI = 'http://localhost:3000'
 SUSPICIOUS_WORDS_FILE = os.path.join(os.getcwd(), "suspicious_words.json")
 USER_DATA_FILE = os.path.join(os.getcwd(), "user_data.json")
 SETTINGS_FILE = os.path.join(os.getcwd(), "settings.json")
+LAYOUT_FILE = os.path.join(os.getcwd(), "layout.json")
 JSON_DIR = os.path.join(os.getcwd(), "chat_data")
 os.makedirs(JSON_DIR, exist_ok=True)
 
@@ -78,6 +80,19 @@ def load_settings():
         except (json.JSONDecodeError, IOError):
             messagebox.showerror("Error", "Settings file is corrupted. Using default settings.")
     return default_settings
+
+def save_layout(layout):
+    with open(LAYOUT_FILE, 'w') as f:
+        json.dump(layout, f, indent=4)
+
+def load_layout():
+    if os.path.exists(LAYOUT_FILE):
+        try:
+            with open(LAYOUT_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            messagebox.showerror("Error", "Layout file is corrupted. Using default layout.")
+    return {}
 
 def get_oauth_url():
     scope = 'chat:read chat:edit'
@@ -154,11 +169,12 @@ def start_bot(token, channel):
 
     threading.Thread(target=asyncio.run, args=(run_bot(),), daemon=True).start()
 
-# Tkinter UI
+# Tkinter UI with Dynamic Color Settings and Drag-and-Drop
 def create_ui():
-    global threshold  # Declare threshold as global
+    global threshold
 
     settings = load_settings()
+    layout = load_layout()
     threshold = settings["threshold"]
 
     user_data = load_user_data()
@@ -168,14 +184,12 @@ def create_ui():
             start_bot(token, channel)
 
     def update_listbox():
-        """Update the listbox to reflect the current suspicious words."""
         listbox.delete(0, "end")
         with lock:
             for word in SUSPICIOUS_WORDS:
                 listbox.insert("end", word)
 
     def add_word():
-        """Add a new word to the suspicious words list."""
         new_word = word_entry.get().strip()
         if new_word and new_word not in SUSPICIOUS_WORDS:
             with lock:
@@ -188,7 +202,6 @@ def create_ui():
             messagebox.showinfo("Error", "Word already exists or is invalid.")
 
     def delete_word():
-        """Delete the selected word from the suspicious words list."""
         selected = listbox.curselection()
         if selected:
             word = listbox.get(selected[0])
@@ -201,7 +214,6 @@ def create_ui():
             messagebox.showinfo("Error", "No word selected.")
 
     def rate_chat():
-        """Rate the chat based on suspicious words usage."""
         with lock:
             if not SUSPICIOUS_WORDS:
                 messagebox.showinfo("Sus Level", "No suspicious words loaded.")
@@ -225,14 +237,12 @@ def create_ui():
         )
 
     def reset_chat():
-        """Reset the suspicious level counters."""
         with lock:
             for word in SUSPICIOUS_WORDS:
                 word_usage_count[word] = 0
         messagebox.showinfo("Reset Sus Level", "Sus level has been reset.")
 
     def update_threshold():
-        """Update the suspicious words threshold."""
         global threshold
         try:
             new_threshold = int(threshold_entry.get().strip())
@@ -246,117 +256,151 @@ def create_ui():
             messagebox.showerror("Invalid Input", "Please enter a valid integer for the threshold.")
 
     def start_login():
-        """Open the Twitch login URL."""
         webbrowser.open(get_oauth_url())
 
     def save_suspicious_words():
-        """Save suspicious words to the file."""
         with open(SUSPICIOUS_WORDS_FILE, 'w') as f:
             json.dump(SUSPICIOUS_WORDS, f, indent=4)
 
-    def update_colors():
-        """Update the colors of the UI elements."""
+    def update_colors(*args):
         color = color_var.get()
         button_color = button_color_var.get()
         window.configure(bg=color)
         for widget in widgets:
-            widget.configure(bg=color, fg=text_color_var.get())
+            if hasattr(widget, 'configure'):
+                widget.configure(bg=color, fg=text_color_var.get())
         for button in buttons:
-            button.configure(bg=button_color)
+            if hasattr(button, 'configure'):
+                button.configure(bg=button_color, fg=text_color_var.get())
         save_settings(color, text_color_var.get(), button_color, threshold)
 
-    def upload_settings():
-        """Upload the current settings for sharing or backup."""
-        try:
-            with open(SETTINGS_FILE, 'r') as f:
-                settings = json.load(f)
-            upload_path = os.path.join(os.getcwd(), "uploaded_settings.json")
-            with open(upload_path, 'w') as uf:
-                json.dump(settings, uf, indent=4)
-            messagebox.showinfo("Upload Settings", f"Settings successfully uploaded to {upload_path}.")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to upload settings: {e}")
+    def select_color(var):
+        color = askcolor()[1]
+        if color:
+            var.set(color)
 
-    # Main UI Window
+    def on_close():
+        layout = {
+            widget_names[widget]: {'x': widget.winfo_x(), 'y': widget.winfo_y()}
+            for widget in draggable_widgets
+        }
+        save_layout(layout)
+        window.destroy()
+
+    def start_drag(event):
+        widget = event.widget
+        widget.start_x = event.x
+        widget.start_y = event.y
+
+    def do_drag(event):
+        widget = event.widget
+        x = widget.winfo_x() - widget.start_x + event.x
+        y = widget.winfo_y() - widget.start_y + event.y
+        widget.place(x=x, y=y)
+
     window = Tk()
     window.title("Sus Tracker - Manage Suspicious Words")
+    window.geometry("800x600")
+    window.protocol("WM_DELETE_WINDOW", on_close)
 
     color_var = StringVar(value=settings["ui_color"])
     text_color_var = StringVar(value=settings["text_color"])
     button_color_var = StringVar(value=settings["button_color"])
 
-    color_label = Label(window, text="UI Color:")
-    color_label.grid(row=0, column=2, padx=10, pady=5)
+    color_var.trace_add("write", update_colors)
+    text_color_var.trace_add("write", update_colors)
+    button_color_var.trace_add("write", update_colors)
 
-    color_options = ["white", "lightblue", "lightgreen", "lightyellow", "pink", "grey", "purple",]
-    color_menu = OptionMenu(window, color_var, *color_options, command=lambda _: update_colors())
-    color_menu.grid(row=0, column=3, padx=10, pady=5)
+    widgets = []
+    buttons = []
+    draggable_widgets = []
+    widget_names = {}
 
-    text_color_label = Label(window, text="Text Color:")
-    text_color_label.grid(row=1, column=2, padx=10, pady=5)
-
-    text_color_menu = OptionMenu(window, text_color_var, *["black", "blue", "green", "red"], command=lambda _: update_colors())
-    text_color_menu.grid(row=1, column=3, padx=10, pady=5)
-
-    button_color_label = Label(window, text="Button Color:")
-    button_color_label.grid(row=2, column=2, padx=10, pady=5)
-
-    button_color_menu = OptionMenu(window, button_color_var, *["lightgrey", "white", "blue", "green", "red", "purple",], command=lambda _: update_colors())
-    button_color_menu.grid(row=2, column=3, padx=10, pady=5)
-
-    widgets = []  # Track all widgets for color updates
-    buttons = []  # Track all buttons for color updates
+    def add_draggable_widget(widget, name):
+        widget_names[widget] = name
+        draggable_widgets.append(widget)
+        widget.bind("<Button-1>", start_drag)
+        widget.bind("<B1-Motion>", do_drag)
 
     word_entry = Entry(window, width=30)
-    word_entry.grid(row=0, column=0, padx=10, pady=10)
+    word_entry.place(x=50, y=50)
     widgets.append(word_entry)
+    add_draggable_widget(word_entry, "word_entry")
 
     add_word_button = Button(window, text="Add Word", command=add_word)
-    add_word_button.grid(row=0, column=1, padx=10, pady=10)
+    add_word_button.place(x=300, y=50)
     buttons.append(add_word_button)
+    add_draggable_widget(add_word_button, "add_word_button")
 
     listbox = Listbox(window, width=40, height=10)
-    listbox.grid(row=1, column=0, padx=10, pady=10)
+    listbox.place(x=50, y=100)
     widgets.append(listbox)
+    add_draggable_widget(listbox, "listbox")
 
     delete_word_button = Button(window, text="Delete Word", command=delete_word)
-    delete_word_button.grid(row=1, column=1, padx=10, pady=10)
+    delete_word_button.place(x=300, y=100)
     buttons.append(delete_word_button)
+    add_draggable_widget(delete_word_button, "delete_word_button")
 
     rate_chat_button = Button(window, text="Rate Chat", command=rate_chat)
-    rate_chat_button.grid(row=3, column=0, padx=10, pady=10)
+    rate_chat_button.place(x=50, y=250)
     buttons.append(rate_chat_button)
+    add_draggable_widget(rate_chat_button, "rate_chat_button")
 
-    reset_chat_button = Button(window, text="Reset Sus Level", command=reset_chat)
-    reset_chat_button.grid(row=3, column=1, padx=10, pady=10)
+    reset_chat_button = Button(window, text="Reset Chat", command=reset_chat)
+    reset_chat_button.place(x=300, y=250)
     buttons.append(reset_chat_button)
+    add_draggable_widget(reset_chat_button, "reset_chat_button")
 
     login_button = Button(window, text="Log in with Twitch", command=start_login)
-    login_button.grid(row=3, column=2, padx=10, pady=10)
+    login_button.place(x=50, y=350)
     buttons.append(login_button)
-
-    upload_settings_button = Button(window, text="Upload Settings", command=upload_settings)
-    upload_settings_button.grid(row=3, column=3, padx=10, pady=10)
-    buttons.append(upload_settings_button)
+    add_draggable_widget(login_button, "login_button")
 
     threshold_label = Label(window, text="Threshold:")
-    threshold_label.grid(row=2, column=0, padx=10, pady=5)
+    threshold_label.place(x=50, y=450)
     widgets.append(threshold_label)
+    add_draggable_widget(threshold_label, "threshold_label")
 
     threshold_entry = Entry(window, width=10)
     threshold_entry.insert(0, str(threshold))
-    threshold_entry.grid(row=2, column=1, padx=10, pady=5)
+    threshold_entry.place(x=150, y=450)
     widgets.append(threshold_entry)
+    add_draggable_widget(threshold_entry, "threshold_entry")
 
     update_threshold_button = Button(window, text="Update Threshold", command=update_threshold)
-    update_threshold_button.grid(row=2, column=2, padx=10, pady=5)
+    update_threshold_button.place(x=300, y=450)
     buttons.append(update_threshold_button)
+    add_draggable_widget(update_threshold_button, "update_threshold_button")
 
-    update_listbox()  # Initialize the listbox with the current words
+    change_ui_color_button = Button(window, text="Change UI Color", command=lambda: select_color(color_var))
+    change_ui_color_button.place(x=50, y=500)
+    buttons.append(change_ui_color_button)
+    add_draggable_widget(change_ui_color_button, "change_ui_color_button")
 
-    update_colors()  # Apply saved settings initially
+    change_text_color_button = Button(window, text="Change Text Color", command=lambda: select_color(text_color_var))
+    change_text_color_button.place(x=200, y=500)
+    buttons.append(change_text_color_button)
+    add_draggable_widget(change_text_color_button, "change_text_color_button")
+
+    change_button_color_button = Button(window, text="Change Button Color", command=lambda: select_color(button_color_var))
+    change_button_color_button.place(x=350, y=500)
+    buttons.append(change_button_color_button)
+    add_draggable_widget(change_button_color_button, "change_button_color_button")
+
+    for widget, name in widget_names.items():
+        if name in layout:
+            widget.place(x=layout[name]['x'], y=layout[name]['y'])
+
+    update_listbox()
+    update_colors()
 
     window.mainloop()
+
+if __name__ == "__main__":
+    threading.Thread(target=start_flask, daemon=True).start()
+    create_ui()
+
 
 if __name__ == "__main__":
     threading.Thread(target=start_flask, daemon=True).start()
