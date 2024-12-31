@@ -402,7 +402,3 @@ if __name__ == "__main__":
     create_ui()
 
 
-if __name__ == "__main__":
-    threading.Thread(target=start_flask, daemon=True).start()
-    create_ui()
-
