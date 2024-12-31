@@ -1,4 +1,4 @@
-# sus-tracker-twitch-bot V6 is current
+# sus-tracker-twitch-bot V6.1 is current
 Sus Tracker
 
 This will alert your firewall. Just allow it because it involves creating a local web server using Flask and  making network requests. This is safe to use. 
