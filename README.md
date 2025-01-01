@@ -1,6 +1,8 @@
 # sus-tracker-twitch-bot V6.1 is current
 Sus Tracker
 
+V6.2 has everything the rest does but has the added message function. This is still in beta. You must be live for it to work. If it does not please give me feedback in my discord. https://discord.gg/36hCvQQd6h
+
 This will alert your firewall. Just allow it because it involves creating a local web server using Flask and  making network requests. This is safe to use. 
 
 You should not need to install libraries since I used pyinstaller to package it. But there will be some listed just in case.
